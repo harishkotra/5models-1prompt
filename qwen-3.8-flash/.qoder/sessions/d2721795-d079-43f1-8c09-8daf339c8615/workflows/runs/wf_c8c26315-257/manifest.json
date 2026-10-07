@@ -1,0 +1,128 @@
+{
+  "runId": "wf_c8c26315-257",
+  "workflowName": "lunar-descent-verify",
+  "scriptPath": "/Users/shk/experiments/builds/5-models/qwen-3.8-flash/.qoder/sessions/d2721795-d079-43f1-8c09-8daf339c8615/workflows/scripts/lunar-descent-verify-wf_c8c26315-257.js",
+  "source": "inline",
+  "meta": {
+    "name": "lunar-descent-verify",
+    "description": "Adversarially verify the Lunar Descent build against its spec",
+    "phases": [
+      {
+        "title": "Audit",
+        "detail": "six independent auditors incl. live browser run"
+      },
+      {
+        "title": "Verify",
+        "detail": "adversarially verify each critical/major finding"
+      }
+    ]
+  },
+  "createdAt": "2026-10-07T01:17:45.404Z",
+  "updatedAt": "2026-10-07T01:33:35.572Z",
+  "status": "completed",
+  "outputPath": "/Users/shk/experiments/builds/5-models/qwen-3.8-flash/.qoder/sessions/d2721795-d079-43f1-8c09-8daf339c8615/workflows/runs/wf_c8c26315-257/output.json",
+  "agents": [
+    {
+      "index": 1,
+      "label": "audit:physics",
+      "phaseIndex": 1,
+      "phaseTitle": "Audit",
+      "journalKey": "v2:3c6e3180a077695f9eb000e106f898892d6661be1317d52dddd6406575ebab47",
+      "agentId": "aworkflow-subagent-4914bf6bc2d7e04e",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/var/folders/d7/5zhspxcn5bngg7szs6hsx1lh0000gn/T/qoder-cli-501/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/tasks/ab14bcfeadf4bf752.output",
+      "transcriptPath": "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-4914bf6bc2d7e04e.jsonl",
+      "attemptTranscriptPaths": [
+        "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-4914bf6bc2d7e04e.jsonl"
+      ],
+      "updatedAt": "2026-10-07T01:33:35.572Z"
+    },
+    {
+      "index": 2,
+      "label": "audit:single-source",
+      "phaseIndex": 1,
+      "phaseTitle": "Audit",
+      "journalKey": "v2:b3a7303c2c61ea315bd634bfc5d614a5f13080ec2e8ef880fb214770a3974e14",
+      "agentId": "aworkflow-subagent-7338c4e8ab6d1bef",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/var/folders/d7/5zhspxcn5bngg7szs6hsx1lh0000gn/T/qoder-cli-501/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/tasks/a31c49a01dc4c4753.output",
+      "transcriptPath": "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-7338c4e8ab6d1bef.jsonl",
+      "attemptTranscriptPaths": [
+        "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-7338c4e8ab6d1bef.jsonl"
+      ],
+      "updatedAt": "2026-10-07T01:33:35.572Z"
+    },
+    {
+      "index": 3,
+      "label": "audit:autopilot-crosscheck",
+      "phaseIndex": 1,
+      "phaseTitle": "Audit",
+      "journalKey": "v2:fbcf991174283d0e24e65e835ebfc2c9b2635795616dd8e1b85a9985e8a866c4",
+      "agentId": "aworkflow-subagent-59acf83f7a2f6665",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/var/folders/d7/5zhspxcn5bngg7szs6hsx1lh0000gn/T/qoder-cli-501/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/tasks/a426807b463884ba1.output",
+      "transcriptPath": "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-59acf83f7a2f6665.jsonl",
+      "attemptTranscriptPaths": [
+        "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-59acf83f7a2f6665.jsonl"
+      ],
+      "updatedAt": "2026-10-07T01:33:35.572Z"
+    },
+    {
+      "index": 4,
+      "label": "audit:browser",
+      "phaseIndex": 1,
+      "phaseTitle": "Audit",
+      "journalKey": "v2:02710bc14a71f2b21e10d0de78933b46a2147802c2329ab5ec9210edb38a56fe",
+      "agentId": "aworkflow-subagent-1d3cd850402816b4",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/var/folders/d7/5zhspxcn5bngg7szs6hsx1lh0000gn/T/qoder-cli-501/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/tasks/a723bac2a1b475d71.output",
+      "transcriptPath": "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-1d3cd850402816b4.jsonl",
+      "attemptTranscriptPaths": [
+        "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-1d3cd850402816b4.jsonl"
+      ],
+      "updatedAt": "2026-10-07T01:33:35.572Z"
+    },
+    {
+      "index": 5,
+      "label": "audit:ui-spec",
+      "phaseIndex": 1,
+      "phaseTitle": "Audit",
+      "journalKey": "v2:a0d5c4cacc4cb41bacae72fab026866ae49babec72c032dc2848829d364aa21e",
+      "agentId": "aworkflow-subagent-c8e18b07a6aec6d8",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/var/folders/d7/5zhspxcn5bngg7szs6hsx1lh0000gn/T/qoder-cli-501/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/tasks/aefa65ef3a80b3981.output",
+      "transcriptPath": "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-c8e18b07a6aec6d8.jsonl",
+      "attemptTranscriptPaths": [
+        "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-c8e18b07a6aec6d8.jsonl"
+      ],
+      "updatedAt": "2026-10-07T01:33:35.572Z"
+    },
+    {
+      "index": 6,
+      "label": "audit:acceptance-critic",
+      "phaseIndex": 1,
+      "phaseTitle": "Audit",
+      "journalKey": "v2:59bb3a6fe28a39ee64533ea4e70b512873c493db2954acc351655b05363d9db3",
+      "agentId": "aworkflow-subagent-6f564d8a6036f0ce",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/var/folders/d7/5zhspxcn5bngg7szs6hsx1lh0000gn/T/qoder-cli-501/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/tasks/ac6a44eb93abb4f8e.output",
+      "transcriptPath": "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-6f564d8a6036f0ce.jsonl",
+      "attemptTranscriptPaths": [
+        "/Users/shk/.qoder/projects/-Users-shk-experiments-builds-5-models-qwen-3-8-flash/d2721795-d079-43f1-8c09-8daf339c8615/subagents/agent-aworkflow-subagent-6f564d8a6036f0ce.jsonl"
+      ],
+      "updatedAt": "2026-10-07T01:33:35.572Z"
+    }
+  ]
+}

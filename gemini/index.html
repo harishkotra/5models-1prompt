@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lunar Descent - Physics Simulation</title>
+  <style>
+    :root {
+      --bg: #090c10;
+      --card-bg: rgba(18, 22, 32, 0.88);
+      --border-color: rgba(65, 80, 110, 0.45);
+      --accent: #58a6ff;
+      --accent-glow: rgba(88, 166, 255, 0.25);
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --success: #3fb950;
+      --danger: #f85149;
+      --warning: #d29922;
+      --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    header {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(13, 17, 23, 0.95);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #fff;
+    }
+
+    .tagline {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      font-mono: var(--font-mono);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    button {
+      background: #21262d;
+      color: var(--text);
+      border: 1px solid var(--border-color);
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.btn-primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.btn-primary:hover {
+      background: #388bfd;
+      box-shadow: 0 0 12px rgba(56, 139, 253, 0.4);
+    }
+
+    button.btn-success {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+    button.btn-success:hover {
+      background: #2ea043;
+      box-shadow: 0 0 12px rgba(46, 160, 67, 0.4);
+    }
+
+    .main-layout {
+      flex: 1;
+      position: relative;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #sim-canvas {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #040609;
+    }
+
+    /* Floating HUD Panels */
+    .overlay-panel {
+      position: absolute;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      pointer-events: auto;
+      z-index: 5;
+    }
+
+    #hud-panel {
+      top: 16px;
+      left: 16px;
+      width: 280px;
+      padding: 14px 16px;
+    }
+
+    #constants-panel {
+      bottom: 24px;
+      left: 16px;
+      width: 280px;
+      padding: 12px 16px;
+      font-size: 0.75rem;
+    }
+
+    #instructions-panel {
+      top: 16px;
+      right: 16px;
+      width: 260px;
+      padding: 12px 16px;
+      font-size: 0.78rem;
+    }
+
+    .panel-header {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 6px;
+    }
+
+    .hud-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      row-gap: 8px;
+      column-gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .hud-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud-label {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .hud-value {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .hud-meter {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+
+    .hud-meter-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.05s linear;
+    }
+
+    .hud-meter-bar.fuel {
+      background: #3fb950;
+    }
+
+    .hud-meter-bar.throttle {
+      background: #f0883e;
+    }
+
+    .const-list {
+      list-style: none;
+      font-family: var(--font-mono);
+      color: #c9d1d9;
+      line-height: 1.5;
+    }
+    .const-list span {
+      color: var(--accent);
+    }
+
+    .key-badge {
+      display: inline-block;
+      padding: 1px 5px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: #fff;
+    }
+
+    /* Verdict Banner Overlay */
+    #verdict-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(13, 17, 23, 0.94);
+      border: 2px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px 32px;
+      text-align: center;
+      min-width: 420px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(16px);
+      z-index: 30;
+      display: none;
+      animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+      from { transform: translate(-50%, -50%) scale(0.92); opacity: 0; }
+      to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    #verdict-title {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    #verdict-title.landed {
+      color: var(--success);
+      text-shadow: 0 0 20px rgba(63, 185, 80, 0.5);
+    }
+
+    #verdict-title.crashed {
+      color: var(--danger);
+      text-shadow: 0 0 20px rgba(248, 81, 73, 0.5);
+    }
+
+    .verdict-reasons {
+      margin: 12px 0;
+      font-size: 0.85rem;
+      color: #ff7b72;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.25);
+      border-radius: 6px;
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .verdict-numbers-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .verdict-actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    footer {
+      padding: 10px 24px;
+      background: #090c10;
+      border-top: 1px solid var(--border-color);
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+      color: #79c0ff;
+    }
+
+    .status-toast {
+      position: fixed;
+      bottom: 50px;
+      right: 24px;
+      background: #1f6feb;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s ease;
+      pointer-events: none;
+      z-index: 40;
+    }
+    .status-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <h1>Lunar Descent</h1>
+      <span class="tagline">Deterministic Lunar Lander Simulator</span>
+    </div>
+    <div class="toolbar">
+      <button id="btn-autopilot-instant" class="btn-primary" title="Instantly calculate deterministic autopilot result">
+        ▶ RUN AUTOPILOT
+      </button>
+      <button id="btn-replay-slow" title="Watch deterministic autopilot land in real time">
+        ↺ REPLAY SLOW
+      </button>
+      <button id="btn-manual-reset" title="Take manual flight controls">
+        🕹 MANUAL FLIGHT
+      </button>
+      <button id="btn-copy-json" title="Copy trajectory samples (every 6th step)">
+        📋 COPY TRAJECTORY JSON
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <canvas id="sim-canvas"></canvas>
+
+    <!-- Telemetry HUD -->
+    <div id="hud-panel" class="overlay-panel">
+      <div class="panel-header">
+        <span>Flight Telemetry</span>
+        <span id="flight-mode-badge" style="color: #3fb950; font-size: 0.7rem;">MANUAL</span>
+      </div>
+      <div class="hud-grid">
+        <div class="hud-item">
+          <span class="hud-label">Altitude (y)</span>
+          <span class="hud-value" id="hud-alt">100.00 m</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Offset (x)</span>
+          <span class="hud-value" id="hud-x">0.00 m</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Vert Speed (vy)</span>
+          <span class="hud-value" id="hud-vy">-10.00 m/s</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Horiz Speed (vx)</span>
+          <span class="hud-value" id="hud-vx">+5.00 m/s</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Tilt (θ)</span>
+          <span class="hud-value" id="hud-theta">0.00°</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Sim Time</span>
+          <span class="hud-value" id="hud-time">0.00 s</span>
+        </div>
+        <div class="hud-item" style="grid-column: span 2;">
+          <span class="hud-label">Fuel Remaining</span>
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span class="hud-value" id="hud-fuel">250.0 kg</span>
+            <span style="font-size: 0.72rem; color: var(--text-dim);" id="hud-fuel-pct">100%</span>
+          </div>
+          <div class="hud-meter">
+            <div id="hud-fuel-bar" class="hud-meter-bar fuel" style="width: 100%;"></div>
+          </div>
+        </div>
+        <div class="hud-item" style="grid-column: span 2;">
+          <span class="hud-label">Throttle Output</span>
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span class="hud-value" id="hud-throttle">0%</span>
+            <span style="font-size: 0.72rem; color: var(--text-dim);" id="hud-thrust-n">0 N</span>
+          </div>
+          <div class="hud-meter">
+            <div id="hud-throttle-bar" class="hud-meter-bar throttle" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fixed Physics Constants Display -->
+    <div id="constants-panel" class="overlay-panel">
+      <div class="panel-header">
+        <span>Fixed Physics Spec</span>
+        <span style="color: var(--text-dim); font-size: 0.68rem;">VERIFIED</span>
+      </div>
+      <ul class="const-list">
+        <li>GRAVITY: <span>1.62 m/s²</span> (Moon)</li>
+        <li>DRY_MASS: <span>500 kg</span></li>
+        <li>FUEL_START: <span>250 kg</span></li>
+        <li>MAX_THRUST: <span>3000 N</span></li>
+        <li>BURN_RATE: <span>8 kg/s</span></li>
+        <li>MAX_ANGULAR_ACCEL: <span>90 °/s²</span></li>
+        <li>MAX_ANGULAR_RATE: <span>45 °/s</span></li>
+        <li>TIMESTEP (DT): <span>1/60 s (fixed)</span></li>
+        <li style="margin-top: 4px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 4px;">
+          TOUCHDOWN LIMITS: |vy|≤3 |vx|≤2 |θ|≤10° |x|≤15m
+        </li>
+      </ul>
+    </div>
+
+    <!-- Manual Flight Controls Guide -->
+    <div id="instructions-panel" class="overlay-panel">
+      <div class="panel-header">
+        <span>Manual Controls</span>
+      </div>
+      <p style="color: var(--text-dim); margin-bottom: 8px;">Pilot the lander safely to the pad zone (|x| ≤ 15m):</p>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.76rem;">
+        <div><span class="key-badge">W</span> / <span class="key-badge">↑</span> : Throttle Up (hold)</div>
+        <div><span class="key-badge">Space</span> : 100% Emergency Throttle</div>
+        <div><span class="key-badge">A</span> / <span class="key-badge">←</span> : RCS Tilt Counter-Clockwise</div>
+        <div><span class="key-badge">D</span> / <span class="key-badge">→</span> : RCS Tilt Clockwise</div>
+      </div>
+    </div>
+
+    <!-- Touchdown / Crash Verdict Modal -->
+    <div id="verdict-modal">
+      <div id="verdict-title" class="landed">LANDED</div>
+      <p id="verdict-subtitle" style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 12px;">
+        Touchdown confirmed within safety thresholds.
+      </p>
+
+      <div id="verdict-reasons" class="verdict-reasons" style="display: none;"></div>
+
+      <div class="verdict-numbers-grid">
+        <div>Vert Speed (vy): <strong id="v-vy">-1.21 m/s</strong> (limit 3.0)</div>
+        <div>Lat Speed (vx): <strong id="v-vx">-0.91 m/s</strong> (limit 2.0)</div>
+        <div>Tilt Angle (θ): <strong id="v-theta">0.00°</strong> (limit 10.0°)</div>
+        <div>Pad Offset (x): <strong id="v-x">+3.96 m</strong> (limit 15.0)</div>
+        <div>Fuel Remaining: <strong id="v-fuel">169.75 kg</strong></div>
+        <div>Elapsed Time: <strong id="v-time">20.05 s</strong></div>
+      </div>
+
+      <div class="verdict-actions">
+        <button id="modal-btn-replay" class="btn-primary">↺ Watch Replay</button>
+        <button id="modal-btn-retry">Try Manual Landing</button>
+        <button id="modal-btn-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="status-toast">Trajectory JSON copied to clipboard!</div>
+
+  <footer>
+    <div>
+      Built By Harish Kotra <a href="https://harishkotra.me" target="_blank" rel="noopener">harishkotra.me</a>
+    </div>
+    <div>
+      <a href="https://dailybuild.xyz" target="_blank" rel="noopener">Checkout my other builds</a>
+    </div>
+  </footer>
+
+  <script type="module">
+    import {
+      GRAVITY,
+      DRY_MASS,
+      MAX_THRUST,
+      BURN_RATE,
+      FUEL_START,
+      MAX_ANGULAR_ACCEL,
+      MAX_ANGULAR_RATE,
+      DT,
+      START_STATE,
+      LIMITS,
+      clamp,
+      createInitialState,
+      step,
+      evaluateTouchdown,
+      autopilot,
+      run
+    } from './sim.mjs';
+
+    // Canvas & Context
+    const canvas = document.getElementById('sim-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI Elements
+    const hudAlt = document.getElementById('hud-alt');
+    const hudX = document.getElementById('hud-x');
+    const hudVy = document.getElementById('hud-vy');
+    const hudVx = document.getElementById('hud-vx');
+    const hudTheta = document.getElementById('hud-theta');
+    const hudTime = document.getElementById('hud-time');
+    const hudFuel = document.getElementById('hud-fuel');
+    const hudFuelPct = document.getElementById('hud-fuel-pct');
+    const hudFuelBar = document.getElementById('hud-fuel-bar');
+    const hudThrottle = document.getElementById('hud-throttle');
+    const hudThrustN = document.getElementById('hud-thrust-n');
+    const hudThrottleBar = document.getElementById('hud-throttle-bar');
+    const modeBadge = document.getElementById('flight-mode-badge');
+
+    const verdictModal = document.getElementById('verdict-modal');
+    const verdictTitle = document.getElementById('verdict-title');
+    const verdictSubtitle = document.getElementById('verdict-subtitle');
+    const verdictReasons = document.getElementById('verdict-reasons');
+    const vVy = document.getElementById('v-vy');
+    const vVx = document.getElementById('v-vx');
+    const vTheta = document.getElementById('v-theta');
+    const vX = document.getElementById('v-x');
+    const vFuel = document.getElementById('v-fuel');
+    const vTime = document.getElementById('v-time');
+
+    const toast = document.getElementById('toast');
+
+    // Simulation & Mode State
+    // Modes: 'manual', 'replay'
+    let mode = 'manual';
+    let currentState = createInitialState();
+    let simTime = 0;
+    let stepCount = 0;
+    let isFinished = false;
+    let currentVerdict = null;
+    let currentThrottle = 0;
+
+    // Trajectory recordings (for manual or current run)
+    let trajectorySamples = [];
+
+    // Precomputed deterministic autopilot replay data
+    let recordedAutopilotRun = null;
+    let replayIndex = 0; // step index for replay
+
+    // Keyboard state
+    const keys = {
+      ArrowUp: false,
+      ArrowDown: false,
+      ArrowLeft: false,
+      ArrowRight: false,
+      KeyW: false,
+      KeyS: false,
+      KeyA: false,
+      KeyD: false,
+      Space: false
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (keys.hasOwnProperty(e.code)) {
+        keys[e.code] = true;
+        // If in replay or finished, pressing controls can switch to manual
+        if (mode === 'replay' && isFinished) {
+          startManualMode();
+        }
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (keys.hasOwnProperty(e.code)) {
+        keys[e.code] = false;
+      }
+    });
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // Trajectory path history for visual trail
+    let visualTrail = [];
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Procedural Stars
+    const stars = [];
+    for (let i = 0; i < 180; i++) {
+      stars.push({
+        x: Math.random() * 2000 - 1000,
+        y: Math.random() * 400 + 10,
+        size: Math.random() * 1.8 + 0.6,
+        alpha: Math.random() * 0.7 + 0.3
+      });
+    }
+
+    // Surface hills profile (relative to lunar surface y=0)
+    const surfaceCraters = [
+      { x: -90, r: 24, depth: 3.5 },
+      { x: -45, r: 16, depth: 2.2 },
+      { x: 50, r: 28, depth: 4.0 },
+      { x: 110, r: 35, depth: 5.2 },
+      { x: 180, r: 20, depth: 2.8 }
+    ];
+
+    function startManualMode() {
+      mode = 'manual';
+      currentState = createInitialState();
+      simTime = 0;
+      stepCount = 0;
+      isFinished = false;
+      currentVerdict = null;
+      currentThrottle = 0;
+      visualTrail = [{ x: currentState.x, y: currentState.y }];
+      trajectorySamples = [{
+        t: 0,
+        x: currentState.x,
+        y: currentState.y,
+        vx: currentState.vx,
+        vy: currentState.vy,
+        theta: currentState.theta,
+        fuel: currentState.fuel,
+        throttle: 0
+      }];
+      verdictModal.style.display = 'none';
+      modeBadge.textContent = 'MANUAL PILOT';
+      modeBadge.style.color = '#58a6ff';
+    }
+
+    function executeInstantAutopilot() {
+      // Run deterministic simulation using sim.mjs runner
+      recordedAutopilotRun = run(autopilot);
+      currentState = { ...recordedAutopilotRun.state };
+      simTime = recordedAutopilotRun.t;
+      stepCount = recordedAutopilotRun.steps;
+      isFinished = true;
+      currentVerdict = recordedAutopilotRun.verdict;
+      currentThrottle = 0;
+      trajectorySamples = recordedAutopilotRun.trajectory;
+
+      // Extract trail points from trajectory
+      visualTrail = trajectorySamples.map(pt => ({ x: pt.x, y: pt.y }));
+
+      modeBadge.textContent = 'AUTOPILOT (RESULT)';
+      modeBadge.style.color = '#3fb950';
+
+      showVerdictModal(currentVerdict, currentState, simTime);
+      updateHUD(currentState, 0, simTime);
+    }
+
+    function startReplaySlow() {
+      // Ensure we have precomputed deterministic run
+      recordedAutopilotRun = run(autopilot);
+      trajectorySamples = recordedAutopilotRun.trajectory;
+
+      mode = 'replay';
+      currentState = createInitialState();
+      simTime = 0;
+      stepCount = 0;
+      replayIndex = 0;
+      isFinished = false;
+      currentVerdict = null;
+      currentThrottle = 0;
+      visualTrail = [{ x: currentState.x, y: currentState.y }];
+      verdictModal.style.display = 'none';
+
+      modeBadge.textContent = 'AUTOPILOT REPLAY';
+      modeBadge.style.color = '#d29922';
+    }
+
+    function showVerdictModal(verdict, state, time) {
+      if (verdict.landed) {
+        verdictTitle.textContent = 'LANDED';
+        verdictTitle.className = 'landed';
+        verdictSubtitle.textContent = 'TOUCHDOWN CONFIRMED! Landed safely within pad limits.';
+        verdictReasons.style.display = 'none';
+      } else {
+        verdictTitle.textContent = 'CRASHED';
+        verdictTitle.className = 'crashed';
+        verdictSubtitle.textContent = 'FLIGHT TERMINATED: Landing criteria exceeded.';
+        verdictReasons.style.display = 'block';
+        verdictReasons.innerHTML = verdict.reasons.map(r => `<div>• ${r}</div>`).join('');
+      }
+
+      vVy.textContent = `${state.vy >= 0 ? '+' : ''}${state.vy.toFixed(2)} m/s`;
+      vVy.style.color = Math.abs(state.vy) <= LIMITS.vy ? '#3fb950' : '#f85149';
+
+      vVx.textContent = `${state.vx >= 0 ? '+' : ''}${state.vx.toFixed(2)} m/s`;
+      vVx.style.color = Math.abs(state.vx) <= LIMITS.vx ? '#3fb950' : '#f85149';
+
+      vTheta.textContent = `${state.theta.toFixed(2)}°`;
+      vTheta.style.color = Math.abs(state.theta) <= LIMITS.theta ? '#3fb950' : '#f85149';
+
+      vX.textContent = `${state.x >= 0 ? '+' : ''}${state.x.toFixed(2)} m`;
+      vX.style.color = Math.abs(state.x) <= LIMITS.x ? '#3fb950' : '#f85149';
+
+      vFuel.textContent = `${state.fuel.toFixed(1)} kg`;
+      vTime.textContent = `${time.toFixed(2)} s`;
+
+      verdictModal.style.display = 'block';
+    }
+
+    function updateHUD(state, throttle, t) {
+      hudAlt.textContent = `${Math.max(0, state.y).toFixed(2)} m`;
+      hudX.textContent = `${state.x >= 0 ? '+' : ''}${state.x.toFixed(2)} m`;
+      hudVy.textContent = `${state.vy >= 0 ? '+' : ''}${state.vy.toFixed(2)} m/s`;
+      hudVx.textContent = `${state.vx >= 0 ? '+' : ''}${state.vx.toFixed(2)} m/s`;
+      hudTheta.textContent = `${state.theta.toFixed(2)}°`;
+      hudTime.textContent = `${t.toFixed(2)} s`;
+
+      hudFuel.textContent = `${state.fuel.toFixed(1)} kg`;
+      const fuelPct = clamp((state.fuel / FUEL_START) * 100, 0, 100);
+      hudFuelPct.textContent = `${fuelPct.toFixed(0)}%`;
+      hudFuelBar.style.width = `${fuelPct}%`;
+      hudFuelBar.style.backgroundColor = fuelPct < 20 ? 'var(--danger)' : fuelPct < 45 ? 'var(--warning)' : 'var(--success)';
+
+      hudThrottle.textContent = `${(throttle * 100).toFixed(0)}%`;
+      hudThrustN.textContent = `${(throttle * MAX_THRUST).toFixed(0)} N`;
+      hudThrottleBar.style.width = `${throttle * 100}%`;
+    }
+
+    // UI Buttons
+    document.getElementById('btn-autopilot-instant').addEventListener('click', executeInstantAutopilot);
+    document.getElementById('btn-replay-slow').addEventListener('click', startReplaySlow);
+    document.getElementById('btn-manual-reset').addEventListener('click', startManualMode);
+
+    document.getElementById('btn-copy-json').addEventListener('click', () => {
+      // Use current trajectory or compute fresh autopilot trajectory if empty
+      let dataToCopy = trajectorySamples;
+      if (!dataToCopy || dataToCopy.length === 0) {
+        if (!recordedAutopilotRun) {
+          recordedAutopilotRun = run(autopilot);
+        }
+        dataToCopy = recordedAutopilotRun.trajectory;
+      }
+      const json = JSON.stringify(dataToCopy, null, 2);
+      navigator.clipboard.writeText(json).then(() => {
+        showToast(`Copied ${dataToCopy.length} trajectory points to clipboard!`);
+      }).catch(() => {
+        showToast('Clipboard access denied.');
+      });
+    });
+
+    document.getElementById('modal-btn-replay').addEventListener('click', () => {
+      startReplaySlow();
+    });
+    document.getElementById('modal-btn-retry').addEventListener('click', () => {
+      startManualMode();
+    });
+    document.getElementById('modal-btn-dismiss').addEventListener('click', () => {
+      verdictModal.style.display = 'none';
+    });
+
+    // Main animation loop
+    let lastAnimTimestamp = performance.now();
+    let simAccumulator = 0;
+
+    function gameLoop(now) {
+      requestAnimationFrame(gameLoop);
+
+      const deltaMs = Math.min(now - lastAnimTimestamp, 100);
+      lastAnimTimestamp = now;
+
+      if (!isFinished) {
+        if (mode === 'manual') {
+          // Fixed timestep integration loop
+          simAccumulator += deltaMs / 1000;
+          while (simAccumulator >= DT && !isFinished) {
+            simAccumulator -= DT;
+
+            // Compute manual controls
+            let throttle = 0;
+            if (keys.Space) {
+              throttle = 1.0;
+            } else if (keys.ArrowUp || keys.KeyW) {
+              throttle = 0.85;
+            }
+
+            let torque = 0;
+            if (keys.ArrowLeft || keys.KeyA) torque -= 1.0;
+            if (keys.ArrowRight || keys.KeyD) torque += 1.0;
+
+            currentThrottle = throttle;
+            currentState = step(currentState, { throttle, torque });
+            stepCount++;
+            simTime = stepCount * DT;
+
+            if (stepCount % 6 === 0) {
+              trajectorySamples.push({
+                t: Number(simTime.toFixed(4)),
+                x: Number(currentState.x.toFixed(4)),
+                y: Number(currentState.y.toFixed(4)),
+                vx: Number(currentState.vx.toFixed(4)),
+                vy: Number(currentState.vy.toFixed(4)),
+                theta: Number(currentState.theta.toFixed(4)),
+                fuel: Number(currentState.fuel.toFixed(4)),
+                throttle: Number(throttle.toFixed(4))
+              });
+            }
+
+            if (stepCount % 2 === 0) {
+              visualTrail.push({ x: currentState.x, y: currentState.y });
+            }
+
+            currentVerdict = evaluateTouchdown(currentState);
+            if (currentVerdict.finished) {
+              isFinished = true;
+              showVerdictModal(currentVerdict, currentState, simTime);
+              break;
+            }
+
+            if (simTime >= 300) {
+              isFinished = true;
+              currentVerdict = {
+                finished: true,
+                landed: false,
+                crashed: true,
+                reasons: ['TIMED OUT: Exceeded 300 s sim time']
+              };
+              showVerdictModal(currentVerdict, currentState, simTime);
+              break;
+            }
+          }
+        } else if (mode === 'replay') {
+          // Replay deterministic autopilot step-by-step
+          simAccumulator += deltaMs / 1000;
+          while (simAccumulator >= DT && !isFinished) {
+            simAccumulator -= DT;
+
+            const ctrl = autopilot(currentState, simTime);
+            currentThrottle = ctrl.throttle ?? 0;
+            currentState = step(currentState, ctrl);
+            stepCount++;
+            simTime = stepCount * DT;
+
+            if (stepCount % 2 === 0) {
+              visualTrail.push({ x: currentState.x, y: currentState.y });
+            }
+
+            currentVerdict = evaluateTouchdown(currentState);
+            if (currentVerdict.finished) {
+              isFinished = true;
+              showVerdictModal(currentVerdict, currentState, simTime);
+              break;
+            }
+
+            if (simTime >= 300) {
+              isFinished = true;
+              currentVerdict = {
+                finished: true,
+                landed: false,
+                crashed: true,
+                reasons: ['TIMED OUT: Exceeded 300 s sim time']
+              };
+              showVerdictModal(currentVerdict, currentState, simTime);
+              break;
+            }
+          }
+        }
+      }
+
+      updateHUD(currentState, currentThrottle, simTime);
+      renderScene(currentState, currentThrottle);
+    }
+
+    // Canvas Rendering
+    function renderScene(state, throttle) {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Camera coordinates:
+      // Real world units: meters. Pad is centered at (x=0, y=0).
+      // Scale: meters to screen pixels
+      const scale = Math.min(width / 75, height / 130);
+
+      // Camera follows lander horizontally, clamps at ground vertically
+      const cameraX = state.x;
+      // Camera y keeps pad visible when low, tracks lander when high
+      const cameraY = Math.max(35, state.y * 0.65 + 15);
+
+      const screenOriginX = width / 2 - cameraX * scale;
+      const screenOriginY = height * 0.72 + cameraY * scale;
+
+      function toScreen(wx, wy) {
+        return {
+          sx: screenOriginX + wx * scale,
+          sy: screenOriginY - wy * scale
+        };
+      }
+
+      // 1. Draw Starfield (parallax effect with camera)
+      ctx.save();
+      for (const s of stars) {
+        const sx = ((s.x - cameraX * 0.2) % width + width) % width;
+        const sy = (s.y % (height * 0.7));
+        ctx.fillStyle = `rgba(220, 230, 255, ${s.alpha})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 2. Trajectory Trail
+      if (visualTrail.length > 1) {
+        ctx.save();
+        ctx.beginPath();
+        const startPt = toScreen(visualTrail[0].x, visualTrail[0].y);
+        ctx.moveTo(startPt.sx, startPt.sy);
+        for (let i = 1; i < visualTrail.length; i++) {
+          const pt = toScreen(visualTrail[i].x, visualTrail[i].y);
+          ctx.lineTo(pt.sx, pt.sy);
+        }
+        ctx.strokeStyle = mode === 'manual' ? 'rgba(88, 166, 255, 0.45)' : 'rgba(63, 185, 80, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 3. Lunar Surface & Hills
+      const groundScreenY = toScreen(0, 0).sy;
+      ctx.save();
+
+      // Terrain polygon
+      ctx.beginPath();
+      ctx.moveTo(-200, height);
+      const minX = -400;
+      const maxX = 400;
+      for (let wx = minX; wx <= maxX; wx += 10) {
+        let wy = 0;
+        // Keep pad flat in [-22, 22]
+        if (Math.abs(wx) > 18) {
+          for (const c of surfaceCraters) {
+            const dist = Math.abs(wx - c.x);
+            if (dist < c.r) {
+              wy -= Math.cos((dist / c.r) * Math.PI * 0.5) * c.depth;
+            }
+          }
+          wy += Math.sin(wx * 0.04) * 2.2 + Math.cos(wx * 0.09) * 1.2;
+        }
+        const pt = toScreen(wx, wy);
+        ctx.lineTo(pt.sx, pt.sy);
+      }
+      ctx.lineTo(width + 200, height);
+      ctx.closePath();
+
+      // Lunar surface gradient
+      const surfaceGrad = ctx.createLinearGradient(0, groundScreenY, 0, height);
+      surfaceGrad.addColorStop(0, '#30363d');
+      surfaceGrad.addColorStop(0.15, '#21262d');
+      surfaceGrad.addColorStop(1, '#0d1117');
+      ctx.fillStyle = surfaceGrad;
+      ctx.fill();
+
+      // Terrain edge highlight
+      ctx.strokeStyle = '#484f58';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 4. Landing Pad & Target Zone
+      // Target zone: |x| <= 15 m
+      const padLeft = toScreen(-15, 0);
+      const padRight = toScreen(15, 0);
+      const padWidth = padRight.sx - padLeft.sx;
+
+      // Base Pad Slab
+      ctx.fillStyle = '#161b22';
+      ctx.fillRect(padLeft.sx - 8, padLeft.sy, padWidth + 16, 12);
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(padLeft.sx, padLeft.sy, padWidth, 10);
+
+      // Pad boundary markers (|x| = 15m)
+      ctx.fillStyle = '#f0883e';
+      ctx.fillRect(padLeft.sx - 2, padLeft.sy - 14, 4, 14);
+      ctx.fillRect(padRight.sx - 2, padRight.sy - 14, 4, 14);
+
+      // Hazard stripes on pad
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(padLeft.sx, padLeft.sy, padWidth, 8);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(210, 153, 34, 0.4)';
+      ctx.lineWidth = 6;
+      for (let stripeX = padLeft.sx - 20; stripeX < padRight.sx + 20; stripeX += 16) {
+        ctx.beginPath();
+        ctx.moveTo(stripeX, padLeft.sy + 10);
+        ctx.lineTo(stripeX + 10, padLeft.sy - 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Center Bullseye Marker (x=0)
+      const padCenter = toScreen(0, 0);
+      ctx.strokeStyle = '#3fb950';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(padCenter.sx, padCenter.sy + 4, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padCenter.sx - 11, padCenter.sy + 4);
+      ctx.lineTo(padCenter.sx + 11, padCenter.sy + 4);
+      ctx.stroke();
+
+      // Landing pad label
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#8b949e';
+      ctx.textAlign = 'center';
+      ctx.fillText('TARGET ZONE (±15m)', padCenter.sx, padCenter.sy + 26);
+      ctx.restore();
+
+      // 5. Draw Lander Craft
+      const landerPos = toScreen(state.x, state.y);
+      ctx.save();
+      ctx.translate(landerPos.sx, landerPos.sy);
+      // theta: 0 = upright, positive tilts nose to right => screen rotation: +theta (clockwise)
+      const thetaRad = (state.theta * Math.PI) / 180;
+      ctx.rotate(thetaRad);
+
+      const craftScale = scale * 0.45;
+
+      // Rocket Flame (scales with throttle)
+      if (throttle > 0.01 && state.fuel > 0) {
+        const flameLength = (15 + throttle * 48) * (craftScale / 12);
+        const flameWidth = (7 + throttle * 9) * (craftScale / 12);
+
+        // Outer Flame (Red/Orange)
+        ctx.beginPath();
+        ctx.moveTo(-flameWidth, 12 * (craftScale / 12));
+        ctx.quadraticCurveTo(0, 12 * (craftScale / 12) + flameLength * 1.1, 0, 12 * (craftScale / 12) + flameLength);
+        ctx.quadraticCurveTo(0, 12 * (craftScale / 12) + flameLength * 1.1, flameWidth, 12 * (craftScale / 12));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 110, 40, 0.85)';
+        ctx.shadowColor = '#ff5722';
+        ctx.shadowBlur = 18;
+        ctx.fill();
+
+        // Inner Flame Core (Bright Yellow/White)
+        ctx.beginPath();
+        ctx.moveTo(-flameWidth * 0.5, 12 * (craftScale / 12));
+        ctx.quadraticCurveTo(0, 12 * (craftScale / 12) + flameLength * 0.65, 0, 12 * (craftScale / 12) + flameLength * 0.6);
+        ctx.quadraticCurveTo(0, 12 * (craftScale / 12) + flameLength * 0.65, flameWidth * 0.5, 12 * (craftScale / 12));
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#ffe600';
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Lander Legs
+      ctx.strokeStyle = '#c9d1d9';
+      ctx.lineWidth = 2.4;
+
+      // Left Leg & Footpad
+      ctx.beginPath();
+      ctx.moveTo(-6 * (craftScale / 12), 4 * (craftScale / 12));
+      ctx.lineTo(-15 * (craftScale / 12), 14 * (craftScale / 12));
+      ctx.moveTo(-18 * (craftScale / 12), 14 * (craftScale / 12));
+      ctx.lineTo(-12 * (craftScale / 12), 14 * (craftScale / 12));
+      // Left Strut
+      ctx.moveTo(-4 * (craftScale / 12), 8 * (craftScale / 12));
+      ctx.lineTo(-12 * (craftScale / 12), 10 * (craftScale / 12));
+      ctx.stroke();
+
+      // Right Leg & Footpad
+      ctx.beginPath();
+      ctx.moveTo(6 * (craftScale / 12), 4 * (craftScale / 12));
+      ctx.lineTo(15 * (craftScale / 12), 14 * (craftScale / 12));
+      ctx.moveTo(12 * (craftScale / 12), 14 * (craftScale / 12));
+      ctx.lineTo(18 * (craftScale / 12), 14 * (craftScale / 12));
+      // Right Strut
+      ctx.moveTo(4 * (craftScale / 12), 8 * (craftScale / 12));
+      ctx.lineTo(12 * (craftScale / 12), 10 * (craftScale / 12));
+      ctx.stroke();
+
+      // Engine Bell
+      ctx.fillStyle = '#586069';
+      ctx.beginPath();
+      ctx.moveTo(-4 * (craftScale / 12), 7 * (craftScale / 12));
+      ctx.lineTo(-6 * (craftScale / 12), 12 * (craftScale / 12));
+      ctx.lineTo(6 * (craftScale / 12), 12 * (craftScale / 12));
+      ctx.lineTo(4 * (craftScale / 12), 7 * (craftScale / 12));
+      ctx.closePath();
+      ctx.fill();
+
+      // Lower Descent Stage (Foil Gold Hexagon)
+      ctx.fillStyle = '#d29922';
+      ctx.strokeStyle = '#e3b341';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-10 * (craftScale / 12), 6 * (craftScale / 12));
+      ctx.lineTo(-12 * (craftScale / 12), -1 * (craftScale / 12));
+      ctx.lineTo(-8 * (craftScale / 12), -6 * (craftScale / 12));
+      ctx.lineTo(8 * (craftScale / 12), -6 * (craftScale / 12));
+      ctx.lineTo(12 * (craftScale / 12), -1 * (craftScale / 12));
+      ctx.lineTo(10 * (craftScale / 12), 6 * (craftScale / 12));
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Upper Ascent Stage (Crew Module / Cockpit)
+      ctx.fillStyle = '#e6edf3';
+      ctx.strokeStyle = '#8b949e';
+      ctx.beginPath();
+      ctx.moveTo(-7 * (craftScale / 12), -6 * (craftScale / 12));
+      ctx.lineTo(-6 * (craftScale / 12), -15 * (craftScale / 12));
+      ctx.lineTo(6 * (craftScale / 12), -15 * (craftScale / 12));
+      ctx.lineTo(7 * (craftScale / 12), -6 * (craftScale / 12));
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Cockpit Window
+      ctx.fillStyle = '#0969da';
+      ctx.beginPath();
+      ctx.arc(0, -11 * (craftScale / 12), 2.5 * (craftScale / 12), 0, Math.PI * 2);
+      ctx.fill();
+
+      // RCS Thruster Quads (Left & Right)
+      ctx.fillStyle = '#ff7b72';
+      ctx.fillRect(-10 * (craftScale / 12), -11 * (craftScale / 12), 2 * (craftScale / 12), 4 * (craftScale / 12));
+      ctx.fillRect(8 * (craftScale / 12), -11 * (craftScale / 12), 2 * (craftScale / 12), 4 * (craftScale / 12));
+
+      ctx.restore();
+    }
+
+    // Start in manual mode and run the loop
+    startManualMode();
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

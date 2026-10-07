@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lunar Descent</title>
+<style>
+  :root {
+    --bg: #05060c;
+    --panel: rgba(12, 16, 28, 0.82);
+    --line: rgba(120, 200, 255, 0.22);
+    --accent: #7fd4ff;
+    --good: #5dff9f;
+    --bad: #ff6b6b;
+    --text: #dfe8f5;
+    --dim: #8fa3bd;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 18px 16px 40px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; letter-spacing: 3px; margin: 0; color: #fff; text-transform: uppercase; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--dim); font-size: 12px; }
+  .stage { position: relative; margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: auto; background: #05060c; }
+  .banner {
+    position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+    min-width: 300px; max-width: 92%; padding: 12px 18px; border-radius: 10px;
+    background: rgba(4, 8, 16, 0.9); border: 2px solid var(--line);
+    text-align: center; pointer-events: none; display: none;
+  }
+  .banner.show { display: block; }
+  .banner .word { font-size: 34px; font-weight: 800; letter-spacing: 6px; }
+  .banner.landed { border-color: var(--good); box-shadow: 0 0 28px rgba(93,255,159,.35); }
+  .banner.landed .word { color: var(--good); }
+  .banner.crashed { border-color: var(--bad); box-shadow: 0 0 28px rgba(255,107,107,.35); }
+  .banner.crashed .word { color: var(--bad); }
+  .banner .nums { margin-top: 6px; font-size: 13px; color: var(--text); }
+  .banner .why { margin-top: 6px; font-size: 13px; color: var(--bad); }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  button {
+    font: inherit; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;
+    color: #041018; background: var(--accent); border: 0; border-radius: 8px;
+    padding: 11px 16px; cursor: pointer; font-weight: 700;
+  }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  .panels { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-top: 16px; }
+  @media (max-width: 760px) { .panels { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .panel h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; }
+  .cell .k { font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+  .cell .v { font-size: 16px; color: #fff; }
+  .consts { font-size: 12px; color: var(--dim); line-height: 1.7; }
+  .consts b { color: var(--text); font-weight: 600; }
+  .hint { margin-top: 12px; font-size: 12px; color: var(--dim); line-height: 1.6; }
+  .hint kbd { background: rgba(127,212,255,.12); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--accent); }
+  footer { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+  footer a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted rgba(127,212,255,.5); }
+  footer a:hover { color: #fff; }
+  .note { margin-top: 10px; font-size: 11px; color: var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Lunar <span>Descent</span></h1>
+      <div class="sub">One lander · one pad · real physics · deterministic autopilot</div>
+    </div>
+    <div class="sub" id="modeLabel">MODE: idle</div>
+  </header>
+
+  <div class="stage">
+    <canvas id="view" width="1000" height="640"></canvas>
+    <div class="banner" id="banner">
+      <div class="word" id="bannerWord">LANDED</div>
+      <div class="nums" id="bannerNums"></div>
+      <div class="why" id="bannerWhy"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btnRun">Run Autopilot</button>
+    <button id="btnReplay" class="ghost">Replay Slow</button>
+    <button id="btnCopy" class="ghost">Copy Trajectory JSON</button>
+    <button id="btnReset" class="ghost">Reset / Manual</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Telemetry</h2>
+      <div class="grid">
+        <div class="cell"><div class="k">Altitude</div><div class="v" id="hAlt">100.0 m</div></div>
+        <div class="cell"><div class="k">vx</div><div class="v" id="hVx">+5.00 m/s</div></div>
+        <div class="cell"><div class="k">vy</div><div class="v" id="hVy">-10.00 m/s</div></div>
+        <div class="cell"><div class="k">Tilt</div><div class="v" id="hTilt">0.0°</div></div>
+        <div class="cell"><div class="k">Fuel</div><div class="v" id="hFuel">250.0 kg</div></div>
+        <div class="cell"><div class="k">Throttle</div><div class="v" id="hThr">0%</div></div>
+      </div>
+      <div class="hint">
+        <b>Manual:</b> <kbd>↑</kbd>/<kbd>W</kbd> throttle up · <kbd>↓</kbd>/<kbd>S</kbd> throttle down ·
+        <kbd>←</kbd>/<kbd>A</kbd> tilt left · <kbd>→</kbd>/<kbd>D</kbd> tilt right ·
+        <kbd>Space</kbd> full throttle. Win: |vy|≤3, |vx|≤2, |tilt|≤10°, |x|≤15 m.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Fixed Physics Constants</h2>
+      <div class="consts">
+        GRAVITY = <b>1.62 m/s²</b><br>
+        DRY_MASS = <b>500 kg</b><br>
+        MAX_THRUST = <b>3000 N</b><br>
+        BURN_RATE = <b>8 kg/s</b><br>
+        FUEL_START = <b>250 kg</b><br>
+        MAX_ANGULAR_ACCEL = <b>90 deg/s²</b><br>
+        MAX_ANGULAR_RATE = <b>45 deg/s</b><br>
+        DT = <b>1/60 s</b> (fixed)<br>
+        LIMITS: |vy|≤<b>3</b> · |vx|≤<b>2</b> · |tilt|≤<b>10°</b> · |x|≤<b>15 m</b><br>
+        AUTOPILOT: <b>deterministic</b>, no random, no clock
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <a href="https://harishkotra.me" target="_blank" rel="noopener">Built By Harish Kotra</a>
+    <a href="https://dailybuild.xyz" target="_blank" rel="noopener">Checkout my other builds</a>
+  </footer>
+  <div class="note">Serve with <b>python3 -m http.server 8080</b> — ES modules do not load from <b>file://</b>.</div>
+</div>
+
+<script type="module">
+import * as sim from './sim.mjs';
+
+// ---------------------------------------------------------------------------
+// Canvas / camera
+// ---------------------------------------------------------------------------
+const canvas = document.getElementById('view');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+const PPM = 4;              // pixels per metre
+const cam = { x: 0, bottom: 0 };
+
+const sx = (x) => (x - cam.x) * PPM + W / 2;
+const sy = (y) => H - (y - cam.bottom) * PPM;
+
+function updateCamera(v) {
+  cam.x = v.x * 0.6;                                   // follow, partially
+  cam.bottom = Math.max(0, v.y - (H * 0.75) / PPM);    // clamp at the ground
+}
+
+// Seeded starfield (deterministic visuals, no Math.random).
+function lcg(seed) {
+  let s = seed >>> 0;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+}
+const rnd = lcg(20240707);
+const stars = [];
+for (let i = 0; i < 240; i++) {
+  stars.push({ x: rnd() * W, y: rnd() * H * 0.82, r: rnd() * 1.3 + 0.2, a: rnd() * 0.7 + 0.25 });
+}
+
+// ---------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------
+function drawStars() {
+  for (const s of stars) {
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = '#cfe6ff';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawGround() {
+  const horizon = sy(0);
+  // lunar surface
+  ctx.fillStyle = '#33343c';
+  ctx.fillRect(0, horizon, W, H - horizon);
+  ctx.fillStyle = '#3d3e47';
+  ctx.fillRect(0, horizon, W, 3);
+  // a few craters
+  ctx.fillStyle = 'rgba(20,20,26,0.55)';
+  const craters = [[-60, 6, 26], [-22, 12, 14], [40, 9, 20], [70, 16, 10], [12, 18, 8]];
+  for (const [cx, depth, rx] of craters) {
+    ctx.beginPath();
+    ctx.ellipse(sx(cx), sy(0) + depth * PPM * 0.3, rx, rx * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPad() {
+  const y0 = sy(0);
+  const left = sx(-20), right = sx(20);
+  // pad slab
+  ctx.fillStyle = '#5a5c66';
+  ctx.fillRect(left, y0 - 2, right - left, 7);
+  ctx.fillStyle = '#6d707c';
+  ctx.fillRect(left, y0 - 2, right - left, 3);
+  // target zone
+  const tl = sx(-15), tr = sx(15);
+  ctx.strokeStyle = '#ffd166';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.strokeRect(tl, y0 - 10, tr - tl, 10);
+  ctx.setLineDash([]);
+  // centre crosshair
+  ctx.strokeStyle = '#ffd166';
+  ctx.lineWidth = 2;
+  const cxp = sx(0);
+  ctx.beginPath();
+  ctx.moveTo(cxp, y0 - 12); ctx.lineTo(cxp, y0 - 1);
+  ctx.moveTo(cxp - 5, y0 - 7); ctx.lineTo(cxp + 5, y0 - 7);
+  ctx.stroke();
+  // label
+  ctx.fillStyle = '#ffd166';
+  ctx.font = '12px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('TARGET ZONE ±15 m', cxp, y0 + 26);
+  ctx.textAlign = 'left';
+}
+
+function drawTrail(v) {
+  const trail = currentTrail;
+  if (!trail || trail.length < 2) return;
+  ctx.beginPath();
+  let started = false;
+  for (const p of trail) {
+    if (replayActive && p.t > v.t + 1e-9) break;
+    const px = sx(p.x), py = sy(p.y);
+    if (!started) { ctx.moveTo(px, py); started = true; }
+    else ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = 'rgba(127, 212, 255, 0.4)';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+}
+
+function drawLander(v, throttle) {
+  const px = sx(v.x), py = sy(v.y);
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(v.theta * Math.PI / 180);
+
+  const m = PPM;
+  // flame (opposite body-up), length scales with throttle
+  if (throttle > 0.01) {
+    const len = (1.5 + throttle * 9) * m;
+    const w = 1.6 * m;
+    const grad = ctx.createLinearGradient(0, 2.4 * m, 0, 2.4 * m + len);
+    grad.addColorStop(0, 'rgba(255, 240, 180, 0.95)');
+    grad.addColorStop(0.4, 'rgba(255, 150, 40, 0.85)');
+    grad.addColorStop(1, 'rgba(255, 60, 0, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, 2.4 * m);
+    ctx.lineTo(w / 2, 2.4 * m);
+    ctx.lineTo(0, 2.4 * m + len);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // legs
+  ctx.strokeStyle = '#c9d3e0';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-2 * m, 2.2 * m); ctx.lineTo(-3.6 * m, 5.0 * m);
+  ctx.moveTo(2 * m, 2.2 * m); ctx.lineTo(3.6 * m, 5.0 * m);
+  ctx.moveTo(-4.4 * m, 5.0 * m); ctx.lineTo(-2.8 * m, 5.0 * m);
+  ctx.moveTo(2.8 * m, 5.0 * m); ctx.lineTo(4.4 * m, 5.0 * m);
+  ctx.stroke();
+
+  // body
+  ctx.fillStyle = '#e8eef7';
+  ctx.strokeStyle = '#9fb0c6';
+  ctx.lineWidth = 2;
+  roundRect(-2 * m, -2.6 * m, 4 * m, 5 * m, 0.7 * m);
+  ctx.fill();
+  ctx.stroke();
+
+  // cockpit
+  ctx.fillStyle = '#2b3d55';
+  ctx.beginPath();
+  ctx.arc(0, -0.8 * m, 0.9 * m, 0, Math.PI * 2);
+  ctx.fill();
+
+  // nozzle
+  ctx.fillStyle = '#8b93a3';
+  ctx.fillRect(-0.8 * m, 2.4 * m, 1.6 * m, 0.7 * m);
+
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  // sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#04050b');
+  sky.addColorStop(1, '#0a1020');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  drawStars();
+  drawGround();
+  drawPad();
+  drawTrail(view);
+  drawLander(view, view.throttle);
+}
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let view = { ...sim.startState(), throttle: 0, t: 0 };
+let mode = 'idle';                 // idle | replay | manual
+let currentTrail = null;           // trajectory array being drawn
+let autopilotResult = null;
+let replayActive = false;
+let replayIndex = 0;
+let replayAccum = 0;
+let manualThrottle = 0;
+let manualTime = 0;
+let manualDone = false;
+const keys = {};
+
+const $ = (id) => document.getElementById(id);
+const banner = $('banner');
+
+function setMode(label) { $('modeLabel').textContent = 'MODE: ' + label; }
+
+function fmt(n, d = 2) {
+  const s = n.toFixed(d);
+  return (n >= 0 ? '+' : '') + s;
+}
+
+function updateHUD() {
+  $('hAlt').textContent = view.y.toFixed(1) + ' m';
+  $('hVx').textContent = fmt(view.vx) + ' m/s';
+  $('hVy').textContent = fmt(view.vy) + ' m/s';
+  $('hTilt').textContent = view.theta.toFixed(1) + '°';
+  $('hFuel').textContent = view.fuel.toFixed(1) + ' kg';
+  $('hThr').textContent = Math.round(view.throttle * 100) + '%';
+}
+
+function showVerdict(r) {
+  banner.classList.remove('landed', 'crashed');
+  banner.classList.add(r.verdict === 'LANDED' ? 'landed' : 'crashed', 'show');
+  $('bannerWord').textContent = r.verdict;
+  const t = r.touchdown;
+  $('bannerNums').textContent =
+    `vy ${t.vy.toFixed(2)} m/s · vx ${t.vx.toFixed(2)} m/s · tilt ${t.tilt.toFixed(2)}° · ` +
+    `x ${t.x.toFixed(2)} m · fuel ${t.fuel.toFixed(2)} kg · ${t.t.toFixed(2)} s`;
+  $('bannerWhy').textContent = r.reason ? r.reason : '';
+}
+
+function hideVerdict() { banner.classList.remove('show'); }
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+$('btnRun').addEventListener('click', () => {
+  autopilotResult = sim.run();
+  mode = 'idle';
+  replayActive = false;
+  currentTrail = autopilotResult.trajectory;
+  view = { ...autopilotResult.final, throttle: 0, t: autopilotResult.touchdown.t };
+  showVerdict(autopilotResult);
+  setMode('autopilot result (instant)');
+});
+
+$('btnReplay').addEventListener('click', () => {
+  autopilotResult = sim.run();
+  mode = 'replay';
+  replayActive = true;
+  replayIndex = 0;
+  replayAccum = 0;
+  currentTrail = autopilotResult.trajectory;
+  hideVerdict();
+  setMode('replay');
+});
+
+$('btnCopy').addEventListener('click', async () => {
+  if (!autopilotResult) autopilotResult = sim.run();
+  const json = JSON.stringify(autopilotResult.trajectory);
+  try {
+    await navigator.clipboard.writeText(json);
+    $('btnCopy').textContent = 'Copied ' + autopilotResult.trajectory.length + ' pts';
+  } catch (e) {
+    // clipboard API needs a secure context; fall back to a prompt
+    window.prompt('Copy trajectory JSON:', json);
+  }
+  setTimeout(() => { $('btnCopy').textContent = 'Copy Trajectory JSON'; }, 1600);
+});
+
+$('btnReset').addEventListener('click', () => {
+  mode = 'idle';
+  replayActive = false;
+  manualDone = false;
+  view = { ...sim.startState(), throttle: 0, t: 0 };
+  currentTrail = null;
+  hideVerdict();
+  setMode('idle');
+});
+
+// ---------------------------------------------------------------------------
+// Manual controls
+// ---------------------------------------------------------------------------
+function startManual() {
+  mode = 'manual';
+  replayActive = false;
+  manualThrottle = 0;
+  manualTime = 0;
+  manualDone = false;
+  currentTrail = null;
+  view = { ...sim.startState(), throttle: 0, t: 0 };
+  hideVerdict();
+  setMode('manual');
+}
+
+const CONTROL_KEYS = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' '];
+
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (CONTROL_KEYS.includes(k)) e.preventDefault();
+  keys[k] = true;
+  if (mode !== 'manual' && !manualDone && CONTROL_KEYS.includes(k)) startManual();
+});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+function manualControl() {
+  const up = keys['arrowup'] || keys['w'];
+  const down = keys['arrowdown'] || keys['s'];
+  const left = keys['arrowleft'] || keys['a'];
+  const right = keys['arrowright'] || keys['d'];
+  if (keys[' ']) {
+    manualThrottle = 1;
+  } else {
+    if (up) manualThrottle += 2.0 * sim.DT;
+    if (down) manualThrottle -= 2.0 * sim.DT;
+    manualThrottle = sim.clamp(manualThrottle, 0, 1);
+  }
+  const torque = (right ? 1 : 0) + (left ? -1 : 0);
+  return { throttle: manualThrottle, torque };
+}
+
+// ---------------------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------------------
+let last = 0;
+function frame(ts) {
+  const dtReal = Math.min(0.05, (ts - last) / 1000 || 0);
+  last = ts;
+
+  if (mode === 'replay' && autopilotResult) {
+    replayAccum += dtReal;
+    while (replayAccum >= sim.DT && replayIndex < autopilotResult.samples.length - 1) {
+      replayIndex++;
+      replayAccum -= sim.DT;
+    }
+    const s = autopilotResult.samples[replayIndex];
+    view = { x: s.x, y: s.y, vx: s.vx, vy: s.vy, theta: s.theta, omega: s.omega, fuel: s.fuel, throttle: s.throttle, t: s.t };
+    if (replayIndex >= autopilotResult.samples.length - 1) {
+      mode = 'idle';
+      replayActive = false;
+      showVerdict(autopilotResult);
+      setMode('autopilot result (replay)');
+    }
+  } else if (mode === 'manual' && !manualDone) {
+    replayAccum += dtReal;
+    let guard = 0;
+    while (replayAccum >= sim.DT && guard++ < 6) {
+      const c = manualControl();
+      const next = sim.step(view, c.throttle, c.torque, sim.DT);
+      manualTime += sim.DT;
+      replayAccum -= sim.DT;
+      view = { ...next, throttle: c.throttle, t: manualTime };
+      if (next.y <= 0) {
+        manualDone = true;
+        mode = 'idle';
+        const r = sim.evaluate(next, manualTime);
+        showVerdict(r);
+        setMode('manual — ' + r.verdict);
+        break;
+      }
+    }
+  }
+
+  updateCamera(view);
+  draw();
+  updateHUD();
+  requestAnimationFrame(frame);
+}
+
+updateCamera(view);
+draw();
+updateHUD();
+setMode('idle');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

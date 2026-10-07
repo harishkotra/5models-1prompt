@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lunar Descent</title>
+<style>
+body{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;background:#0a0c10;color:#d6dcea;height:100vh;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100vh}
+header{padding:10px 14px;background:#14181f;border-bottom:1px solid #28303f}
+h1{font-size:18px;letter-spacing:.02em;margin:0}
+.sub{color:#7e8aa0;font-size:12px;margin:0}
+#stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#06080b;overflow:hidden}
+canvas{display:block;image-rendering:pixelated;box-shadow:0 0 0 1px #28303f}
+.ov{position:absolute;inset:0;pointer-events:none}
+.hud{position:absolute;top:12px;left:12px;background:rgba(10,12,16,.84);border:1px solid #28303f;border-radius:8px;padding:10px 12px;text-align:left;pointer-events:none}
+.hud h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#7e8aa0;margin:0 0 8px;border-bottom:1px solid #28303f;padding-bottom:6px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}
+.row .k{color:#7e8aa0}.row .v{font-variant-numeric:tabular-nums}
+.panel{bottom:12px;left:12px;background:rgba(10,12,16,.88);border:1px solid #28303f;border-radius:8px;padding:10px 12px;max-width:320px}
+.panel h3{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#7e8aa0;margin:0 0 6px}
+.names{display:flex;flex-direction:column;gap:4px;font-size:12px}
+.names div{display:flex;justify-content:space-between;color:#7e8aa0}
+.names b{color:#d6dcea;font-weight:normal}
+footer{display:flex;justify-content:space-between;gap:12px;padding:8px 14px;background:#14181f;border-top:1px solid #28303f;font-size:12px;color:#7e8aa0}
+footer a{color:#5eead4}
+.ctrl{position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+.ctrl button{pointer-events:auto;cursor:pointer;background:linear-gradient(180deg,#1f6f43,#185632);color:#fff;border:1px solid #2e8a5c;padding:10px 14px;border-radius:8px;font-family:inherit;font-size:13px}
+.ctrl button:hover{background:linear-gradient(180deg,#258f56,#1d6b40)}
+.ctrl button.primary{background:linear-gradient(180deg,#3b3b4a,#2b2b38);border-color:#4a4a5a}
+.verdict{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+.verdict .big{font-size:44px;font-weight:700}
+.verdict .tag{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#7e8aa0;margin-bottom:10px}
+.verdict .landed{color:#7ee07e}.verdict .crashed{color:#ff5c5c}
+.verdict .nums{font-size:13px;color:#7e8aa0;margin-top:10px;line-height:1.8}
+@media(max-width:720px){.hud{min-width:auto;top:8px;left:8px;padding:8px 10px}.ctrl button,.footer{font-size:12px;padding:8px 10px}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><h1>LUNAR DESCENT</h1><p class="sub">One lander. One pad. Real physics. The autopilot lands with zero human input.</p></header>
+<div id="stage">
+<canvas id="game" width="900" height="600"></canvas>
+<div class="ov">
+<div id="verdictBanners"></div>
+<div class="hud" id="hud"><h2>LUNAR DESCENT</h2><div class="row"><span class="k">Altitude</span><span class="v" id="hudAlt">100.00 m</span></div><div class="row"><span class="k">vx</span><span class="v" id="hudVx">0.00 m/s</span></div><div class="row"><span class="k">vy</span><span class="v" id="hudVy">0.00 m/s</span></div><div class="row"><span class="k">Tilt</span><span class="v" id="hudTilt">0.00 deg</span></div><div class="row"><span class="k">Fuel</span><span class="v" id="hudFuel">250.00 kg</span></div><div class="row"><span class="k">Throttle</span><span class="v" id="hudThrottle">0.00</span></div><div class="row"><span class="k">Mode</span><span class="v" id="hudMode">Manual</span></div></div>
+<div class="panel"><h3>PHYSICS (fixed)</h3><div class="names"><div><label>GRAVITY</label><b id="cGrav">1.62</b></div><div><label>DRY MASS</label><b id="cDryMass">500</b></div><div><label>MAX THRUST</label><b id="cMaxThrust">3000</b></div><div><label>BURN RATE</label><b id="cBurnRate">8</b></div><div><label>FUEL START</label><b id="cFuelStart">250</b></div><div><label>MAX ANG. ACCEL</label><b id="cAngAccel">90</b></div><div><label>MAX ANG. RATE</label><b id="cAngRate">45</b></div><div><label>DT (timestep)</label><b id="cDT">0.01667 s</b></div></div></div>
+<div class="ctrl"><button id="btnAuto" class="primary">RUN AUTOPILOT</button><button id="btnReplay">REPLAY SLOW</button><button id="btnCopy">COPY TRAJECTORY JSON</button></div>
+</div>
+<footer><span><a href="https://harishkotra.me">Built By Harish Kotra</a></span><span><a href="https://dailybuild.xyz">Checkout my other builds</a></span></footer>
+</div>
+<script type="module">
+import { step, autopilot, START_STATE, run, DT, checkWin, GRAVITY, DRY_MASS, MAX_THRUST, BURN_RATE, FUEL_START, MAX_ANGULAR_ACCEL, MAX_ANGULAR_RATE } from './sim.mjs';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height,mpp=3.0,groundViewY=H-12;
+const padWorldW=30,padWorldH=6;
+const stars=[];
+for(let i=0;i<130;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+.2,b:Math.random()});
+const hud={alt:document.getElementById('hudAlt'),vx:document.getElementById('hudVx'),vy:document.getElementById('hudVy'),tilt:document.getElementById('hudTilt'),fuel:document.getElementById('hudFuel'),throttle:document.getElementById('hudThrottle'),mode:document.getElementById('hudMode')};
+const ids={cGrav:document.getElementById('cGrav'),dryMass:document.getElementById('cDryMass'),maxThrust:document.getElementById('cMaxThrust'),burnRate:document.getElementById('cBurnRate'),fuelStart:document.getElementById('cFuelStart'),angAccel:document.getElementById('cAngAccel'),angRate:document.getElementById('cAngRate'),dt:document.getElementById('cDT')};
+ids.cGrav.textContent=GRAVITY;ids.dryMass.textContent=DRY_MASS;ids.maxThrust.textContent=MAX_THRUST;ids.burnRate.textContent=BURN_RATE;ids.fuelStart.textContent=FUEL_START;ids.angAccel.textContent=MAX_ANGULAR_ACCEL;ids.angRate.textContent=MAX_ANGULAR_RATE;ids.dt.textContent=DT.toFixed(5)+' s';
+let mode='manual',manualThrottle=0,manualTorque=0,state={...START_STATE},trail=[],runResult=null,replayFrames=null,replayIndex=0,currentThrottle=0;
+const toRad=d=>d*Math.PI/180;
+const rot=(nx,ny)=>{const th=toRad(state.theta);return{x:nx*Math.cos(th)-ny*Math.sin(th),y:nx*Math.sin(th)+ny*Math.cos(th)}};
+const sx=x=>W/2+x*mpp;
+const sy=y=>groundViewY-y*mpp;
+window.addEventListener('keydown',e=>{const k=e.key;if(k===' '||k==='Space'){manualThrottle=1;e.preventDefault()}else if(k==='w'||k==='W'||k==='ArrowUp'){manualThrottle=Math.min(1,manualThrottle+.06);e.preventDefault()}else if(k==='s'||k==='S'||k==='ArrowDown'){manualThrottle=Math.max(0,manualThrottle-.06);e.preventDefault()}else if(k==='a'||k==='A'||k==='ArrowLeft'){manualTorque=-1;e.preventDefault()}else if(k==='d'||k==='D'||k==='ArrowRight'){manualTorque=1;e.preventDefault()}else if(k==='m'||k==='M'){mode=mode==='manual'?'replay':'manual';highlight()}});
+window.addEventListener('keyup',e=>{const k=e.key;if(k===' '||k==='Space'){manualThrottle=0;e.preventDefault()}else if(k==='w'||k==='W'||k==='ArrowUp'){manualThrottle=Math.max(0,manualThrottle-.06);e.preventDefault()}else if(k==='s'||k==='S'||k==='ArrowDown'){manualThrottle=Math.min(1,manualThrottle+.06);e.preventDefault()}else if(k==='a'||k==='A'||k==='ArrowLeft'){manualTorque=0;e.preventDefault()}else if(k==='d'||k==='D'||k==='ArrowRight'){manualTorque=0;e.preventDefault()}});
+function highlight(){document.querySelectorAll('.ctrl button').forEach(b=>b.style.display='none');const btn=document.getElementById('btn'+(mode==='manual'?'Auto':'Replay'));if(btn){btn.style.display='block';btn.focus()}}
+function stepFrame(){state=step(state,{throttle:manualThrottle,torque:manualTorque});trail.push({x:state.x,y:state.y});if(trail.length>240)trail.shift()}
+function runAutopilot(){if(!runResult)runResult=run();return runResult}
+document.getElementById('btnAuto').addEventListener('click',()=>{const r=run();runResult=r;mode='manual';trail=[];state={...START_STATE};replayFrames=null;highlight();showVerdict(r)});
+document.getElementById('btnReplay').addEventListener('click',()=>{const r=runAutopilot();const frames=[];let st={...START_STATE};const maxSteps=Math.ceil((r.simTime||300)/DT)+1;for(let i=0;i<maxSteps;i++){const ctl=autopilot(st);st=step(st,ctl);frames.push({state:st,throttle:ctl.throttle,t:(i+1)*DT});if(st.y<=0)break}replayFrames=frames;replayIndex=0;mode='replay';trail=[];state={...START_STATE};highlight()});
+function nextReplay(){if(!replayFrames||replayIndex>=replayFrames.length)return;const f=replayFrames[replayIndex];if(f.state.y<=0)return;state={...f.state};trail.push({x:state.x,y:state.y});if(trail.length>240)trail.shift();currentThrottle=f.throttle;replayIndex++}
+function showVerdict(r){const v=r.verdict;const cls=v==='LANDED'?'landed':'crashed';const reasons=r.reasons.length?r.reasons.join('; '):'All win conditions hold.';document.getElementById('verdictBanners').innerHTML=`<div class="verdict ${cls}"><div class="tag">${v}</div><div class="big">${v}</div><div class="nums">${reasons}</div><div class="nums">vy = ${Number(r.finalState.vy.toFixed(2))} m/s<br>vx = ${Number(r.finalState.vx.toFixed(2))} m/s<br>tilt = ${Number(r.finalState.theta.toFixed(2))} deg<br>x = ${Number(r.finalState.x.toFixed(2))} m<br>fuel = ${Number(r.finalState.fuel.toFixed(2))} kg</div></div>`}
+function drawStarfield(){for(const s of stars){ctx.fillStyle=`rgba(220,230,255,${s.b*.8})`;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()}}
+function drawGround(){ctx.fillStyle='#2b2f36';ctx.fillRect(0,groundViewY-4,W,4);const padW=padWorldW*mpp,padH=padWorldH*mpp,padX=W/2-padW/2,padTop=groundViewY-padH;ctx.fillStyle='#3a404a';ctx.fillRect(padX,padTop,padW,padH);ctx.strokeStyle='#5a6070';ctx.lineWidth=1;ctx.strokeRect(padX,padTop,padW,padH);ctx.beginPath();ctx.arc(W/2,groundViewY-padH/2,Math.min(padW,padH)*.38,0,Math.PI*2);ctx.fillStyle='rgba(120,200,230,.16)';ctx.fill();ctx.strokeStyle='rgba(120,200,230,.5)';ctx.lineWidth=1;ctx.stroke()}
+function drawTrail(){if(trail.length<2)return;ctx.strokeStyle='rgba(110,200,170,.12)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(sx(trail[0].x),sy(trail[0].y));for(let i=3;i<trail.length;i+=3)ctx.lineTo(sx(trail[i].x),sy(trail[i].y));ctx.stroke()}
+function drawLander(){const th=toRad(state.theta),cx=sx(state.x),cy=sy(state.y);ctx.strokeStyle='#6a7080';ctx.lineWidth=2;const lb=rot(10,15),lt=rot(10,42),rb=rot(-10,15),rt=rot(-10,42);ctx.beginPath();ctx.moveTo(cx+lb.x,cy+lb.y);ctx.lineTo(cx+lt.x,cy+lt.y);ctx.stroke();ctx.beginPath();ctx.moveTo(cx+rb.x,cy+rb.y);ctx.lineTo(cx+rt.x,cy+rt.y);ctx.stroke();const bl=22,wd=12;const pts=[rot(0,-bl),rot(-wd,-bl*.35),rot(wd,-bl*.35),rot(0,-4)];ctx.beginPath();ctx.moveTo(cx+pts[0].x,cy+pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(cx+pts[i].x,cy+pts[i].y);ctx.closePath();ctx.fillStyle='#6e6e75';ctx.fill();ctx.strokeStyle='#a8a8af';ctx.lineWidth=1;ctx.stroke();const engine=rot(0,16);ctx.beginPath();ctx.arc(cx+engine.x,cy+engine.y,6,0,Math.PI*2);ctx.fillStyle='#4a4a52';ctx.fill();const fl=state.engineOff?0:Math.min(1,currentThrottle)*26;if(fl>1){const tip=rot(0,-fl),fw=10+currentThrottle*14;ctx.beginPath();ctx.moveTo(cx+engine.x-fw,cy+engine.y-3);ctx.lineTo(cx+engine.x+fw,cy+engine.y+3);ctx.lineTo(cx+tip.x+3,cy+tip.y+4);ctx.lineTo(cx+tip.x-3,cy+tip.y-4);ctx.closePath();ctx.fillStyle=currentThrottle>.6?'#ffd866':currentThrottle>.2?'#ff9a3c':'#ff5c3c';ctx.fill();ctx.strokeStyle='rgba(255,200,120,.45)';ctx.lineWidth=1;ctx.stroke()}}
+function updateHUD(){hud.alt.textContent=Number(state.y.toFixed(2))+' m';hud.vx.textContent=Number(state.vx.toFixed(2))+' m/s';hud.vy.textContent=Number(state.vy.toFixed(2))+' m/s';hud.tilt.textContent=Number(state.theta.toFixed(2))+' deg';hud.fuel.textContent=Number(state.fuel.toFixed(2))+' kg';hud.throttle.textContent=(mode==='manual')?Number(manualThrottle.toFixed(2)):Number((currentThrottle||0).toFixed(2));hud.mode.textContent=mode==='manual'?'Manual':'Replay'}
+
+function frame(){ctx.fillStyle='#06080b';ctx.fillRect(0,0,W,H);drawStarfield();drawGround();if(mode==='manual'){stepFrame();drawTrail();drawLander()}else if(mode==='replay'){nextReplay();drawTrail();drawLander()}updateHUD();requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

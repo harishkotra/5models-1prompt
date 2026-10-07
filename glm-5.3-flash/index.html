@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lunar Descent</title>
+<style>
+  :root {
+    --bg: #05060d;
+    --panel: rgba(10, 14, 26, 0.82);
+    --ink: #d8e2f4;
+    --dim: #7d8aa6;
+    --accent: #ffc95c;
+    --good: #57d98a;
+    --bad: #ff5f56;
+    --line: rgba(125, 138, 166, 0.25);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+  }
+  header { width: 960px; max-width: 100%; padding: 18px 8px 6px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: 6px; color: var(--accent); font-weight: 700; }
+  header p { margin: 4px 0 0; color: var(--dim); font-size: 12px; }
+  #stage { position: relative; width: 960px; max-width: 100%; }
+  canvas { display: block; width: 100%; background: var(--bg); border: 1px solid var(--line); }
+  .overlay {
+    position: absolute; background: var(--panel); border: 1px solid var(--line);
+    padding: 8px 10px; font-size: 11px; line-height: 1.55; pointer-events: none;
+  }
+  #hud { left: 10px; top: 10px; min-width: 195px; }
+  #hud b { color: var(--accent); font-weight: 600; }
+  #hud .row { display: flex; justify-content: space-between; gap: 14px; }
+  #hud .row span:last-child { color: var(--ink); }
+  #consts { right: 10px; top: 10px; color: var(--dim); }
+  #consts .t { color: var(--ink); letter-spacing: 1px; margin-bottom: 3px; }
+  #mode-tag { left: 10px; bottom: 10px; color: var(--accent); font-size: 11px; letter-spacing: 1px; }
+  #verdict {
+    left: 50%; top: 38%; transform: translate(-50%, -50%);
+    text-align: center; padding: 18px 34px; display: none; border-width: 2px;
+  }
+  #verdict .big { font-size: 40px; letter-spacing: 8px; font-weight: 800; }
+  #verdict.landed { border-color: var(--good); } #verdict.landed .big { color: var(--good); }
+  #verdict.crashed { border-color: var(--bad); } #verdict.crashed .big { color: var(--bad); }
+  #verdict .nums { margin-top: 8px; font-size: 12px; line-height: 1.7; color: var(--ink); }
+  #verdict .reason { margin-top: 8px; font-size: 13px; color: var(--bad); font-weight: 700; }
+  #controls { width: 960px; max-width: 100%; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 8px; align-items: center; }
+  button {
+    background: #10162a; color: var(--ink); border: 1px solid var(--line);
+    font: inherit; font-size: 12px; padding: 8px 14px; cursor: pointer; letter-spacing: 1px;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { border-color: var(--accent); color: var(--accent); }
+  #hint { color: var(--dim); font-size: 11px; margin-left: auto; }
+  footer { padding: 14px 8px 26px; color: var(--dim); font-size: 12px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LUNAR DESCENT</h1>
+  <p>One lander. One pad. Real physics. The autopilot is deterministic — same inputs, same landing, every run.</p>
+</header>
+
+<div id="stage">
+  <canvas id="c" width="960" height="620"></canvas>
+  <div class="overlay" id="hud">
+    <div class="row"><span>ALTITUDE</span><span><b id="h-alt">100.0</b> m</span></div>
+    <div class="row"><span>VX</span><span id="h-vx">+5.00 m/s</span></div>
+    <div class="row"><span>VY</span><span id="h-vy">-10.00 m/s</span></div>
+    <div class="row"><span>TILT</span><span id="h-th">0.0°</span></div>
+    <div class="row"><span>FUEL</span><span id="h-fuel">250.0 kg</span></div>
+    <div class="row"><span>THROTTLE</span><span id="h-thr">0 %</span></div>
+  </div>
+  <div class="overlay" id="consts">
+    <div class="t">FIXED PHYSICS</div>
+    <div>GRAVITY 1.62 m/s²</div>
+    <div>DRY_MASS 500 kg</div>
+    <div>MAX_THRUST 3000 N</div>
+    <div>BURN_RATE 8 kg/s</div>
+    <div>FUEL_START 250 kg</div>
+    <div>MAX_ANGULAR_ACCEL 90 °/s²</div>
+    <div>MAX_ANGULAR_RATE 45 °/s</div>
+    <div>DT 1/60 s</div>
+  </div>
+  <div class="overlay" id="mode-tag">MANUAL — press a control key or the button</div>
+  <div class="overlay" id="verdict">
+    <div class="big">LANDED</div>
+    <div class="nums"></div>
+    <div class="reason"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btnAuto" class="primary">RUN AUTOPILOT</button>
+  <button id="btnReplay">REPLAY SLOW</button>
+  <button id="btnManual">MANUAL MODE</button>
+  <button id="btnCopy">COPY TRAJECTORY JSON</button>
+  <span id="hint">↑/W throttle up · ↓/S down · ←/→ or A/D torque · SPACE full throttle</span>
+</div>
+
+<footer>
+  <a href="https://harishkotra.me">Built By Harish Kotra</a> &nbsp;·&nbsp; <a href="https://dailybuild.xyz">Checkout my other builds</a>
+</footer>
+
+<script type="module">
+import { CONST, START, LIMITS, step, autopilot, run, judge } from './sim.mjs';
+
+// ---------- state ----------
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+let mode = 'idle';            // 'idle' | 'auto' | 'replay' | 'manual'
+let state = { ...START };
+let frames = [];              // trajectory export (every 6th step)
+let simSteps = 0;
+let manualThrottle = 0;
+let verdict = null;
+let acc = 0;                  // fixed-step accumulator for real-time modes
+let replayT = 0;
+
+const keys = {};
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+// Deterministic starfield / craters (visuals only, seeded PRNG).
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(1969);
+const stars = Array.from({ length: 220 }, () => ({
+  x: rng() * W, y: rng() * H * 0.9, r: rng() * 1.3 + 0.3, a: rng() * 0.6 + 0.2,
+}));
+const craters = Array.from({ length: 40 }, () => ({
+  x: rng() * 600 - 300, r: rng() * 6 + 2, d: rng() * 0.5 + 0.2,
+}));
+
+// ---------- flight control ----------
+function resetFlight() {
+  state = { ...START };
+  frames = []; simSteps = 0; manualThrottle = 0;
+  verdict = null; acc = 0; replayT = 0;
+  const v = document.getElementById('verdict');
+  v.style.display = 'none';
+}
+
+function recordFrame(throttle) {
+  if (simSteps % 6 === 0) {
+    frames.push({
+      t: +(simSteps * CONST.DT).toFixed(6),
+      x: state.x, y: state.y, vx: state.vx, vy: state.vy,
+      theta: state.theta, fuel: state.fuel, throttle,
+    });
+  }
+}
+
+function doStep(throttle, torque) {
+  state = step(state, throttle, torque);
+  simSteps++;
+  recordFrame(throttle);
+  if (state.y <= 0) finish();
+}
+
+function finish() {
+  verdict = judge(state, false);
+  showVerdict(verdict);
+  mode = 'idle';
+}
+
+function showVerdict(v) {
+  const el = document.getElementById('verdict');
+  el.style.display = 'block';
+  el.className = 'overlay ' + (v.landed ? 'landed' : 'crashed');
+  el.querySelector('.big').textContent = v.landed ? 'LANDED' : 'CRASHED';
+  el.querySelector('.nums').innerHTML =
+    Object.values(v.numbers).map(s => `<div>${s}</div>`).join('');
+  el.querySelector('.reason').textContent = v.landed ? '' : v.reason;
+}
+
+function runAutoInstant() {
+  resetFlight();
+  const r = run();            // same sim.mjs run() the Node test uses
+  frames = r.frames;
+  state = r.final;
+  simSteps = r.steps;
+  lastThrottle = frames.length ? frames[frames.length - 1].throttle : 0;
+  verdict = r.verdict;
+  showVerdict(verdict);
+  mode = 'idle';
+}
+
+function startReplay() {
+  resetFlight();
+  mode = 'replay';
+}
+
+function startManual() {
+  resetFlight();
+  mode = 'manual';
+}
+
+// ---------- input ----------
+const CONTROL_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'];
+addEventListener('keydown', e => {
+  if (CONTROL_KEYS.includes(e.code)) {
+    e.preventDefault();
+    keys[e.code] = true;
+    if (mode !== 'manual') startManual(); // grabbing the stick takes over
+  }
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+document.getElementById('btnAuto').onclick = runAutoInstant;
+document.getElementById('btnReplay').onclick = startReplay;
+document.getElementById('btnManual').onclick = startManual;
+document.getElementById('btnCopy').onclick = async () => {
+  const text = JSON.stringify(frames);
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  const b = document.getElementById('btnCopy');
+  const old = b.textContent;
+  b.textContent = 'COPIED!';
+  setTimeout(() => { b.textContent = old; }, 1200);
+};
+
+// ---------- rendering ----------
+const VIEW_H = 140;           // meters visible vertically
+const scale = H / VIEW_H;     // px per meter
+
+function camera() {
+  // Follow the lander, but never look below the ground (y = 0).
+  const camBottom = Math.max(0, state.y - VIEW_H * 0.68);
+  return { camX: state.x, camBottom };
+}
+const wx = (x, cam) => W / 2 + (x - cam.camX) * scale;
+const wy = (y, cam) => H - (y - cam.camBottom) * scale;
+
+function draw() {
+  const cam = camera();
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#05060d';
+  ctx.fillRect(0, 0, W, H);
+
+  // stars
+  for (const s of stars) {
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = '#cfd8ff';
+    ctx.fillRect(s.x, s.y, s.r, s.r);
+  }
+  ctx.globalAlpha = 1;
+
+  // ground
+  const gy = wy(0, cam);
+  ctx.fillStyle = '#565660';
+  ctx.fillRect(0, gy, W, H - gy);
+  ctx.fillStyle = '#3d3d46';
+  for (const c of craters) {
+    const cx = wx(c.x, cam);
+    if (cx > -30 && cx < W + 30) {
+      ctx.beginPath();
+      ctx.ellipse(cx, gy + 4 + c.d * 8, c.r * scale * 0.6, c.r * scale * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // landing pad + marked target zone (|x| <= 15 m)
+  const px0 = wx(-LIMITS.X, cam), px1 = wx(LIMITS.X, cam);
+  ctx.fillStyle = '#7a7a86';
+  ctx.fillRect(px0, gy - 2, px1 - px0, 5);
+  ctx.fillStyle = '#a8a8b4';
+  ctx.fillRect(wx(-2, cam), gy - 3, wx(2, cam) - wx(-2, cam), 4);
+  for (const ex of [px0, px1]) { // hazard stripes at the zone edges
+    ctx.fillStyle = '#ffc95c';
+    for (let i = 0; i < 4; i++) ctx.fillRect(ex - 2, gy - 10 - i * 7, 4, 4);
+  }
+  ctx.fillStyle = 'rgba(255, 201, 92, 0.85)';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  if (gy < H + 20) ctx.fillText('TARGET ZONE  ±15 m', (px0 + px1) / 2, gy + 18);
+
+  // trajectory trail
+  if (frames.length > 1) {
+    ctx.strokeStyle = 'rgba(130, 150, 255, 0.30)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < frames.length; i++) {
+      const f = frames[i];
+      const X = wx(f.x, cam), Y = wy(f.y, cam);
+      i === 0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y);
+    }
+    ctx.stroke();
+  }
+
+  drawLander(cam);
+}
+
+function drawLander(cam) {
+  const thr = mode === 'manual' ? manualThrottle : lastThrottle;
+  const X = wx(state.x, cam), Y = wy(state.y, cam);
+  ctx.save();
+  ctx.translate(X, Y);
+  ctx.rotate(state.theta * Math.PI / 180);
+  const u = scale; // px per meter
+
+  // flame (length scales with throttle), drawn first so the body overlaps it
+  if (thr > 0.01) {
+    const len = (3 + 15 * thr) * u;
+    const w = 0.7 * u;
+    const g = ctx.createLinearGradient(0, 1.1 * u, 0, 1.1 * u + len);
+    g.addColorStop(0, 'rgba(255, 240, 180, 0.95)');
+    g.addColorStop(0.4, 'rgba(255, 170, 60, 0.85)');
+    g.addColorStop(1, 'rgba(255, 90, 30, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-w, 1.1 * u);
+    ctx.lineTo(w, 1.1 * u);
+    ctx.lineTo(0, 1.1 * u + len);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // legs
+  ctx.strokeStyle = '#9a9aa6';
+  ctx.lineWidth = Math.max(1.5, 0.16 * u);
+  ctx.beginPath();
+  ctx.moveTo(-0.9 * u, 0.4 * u); ctx.lineTo(-1.7 * u, 1.5 * u);
+  ctx.moveTo(0.9 * u, 0.4 * u);  ctx.lineTo(1.7 * u, 1.5 * u);
+  ctx.stroke();
+  ctx.fillStyle = '#9a9aa6';
+  ctx.fillRect(-2.15 * u, 1.5 * u, 0.9 * u, 0.18 * u);
+  ctx.fillRect(1.25 * u, 1.5 * u, 0.9 * u, 0.18 * u);
+
+  // nozzle
+  ctx.fillStyle = '#6f6f7a';
+  ctx.beginPath();
+  ctx.moveTo(-0.35 * u, 0.7 * u);
+  ctx.lineTo(0.35 * u, 0.7 * u);
+  ctx.lineTo(0.55 * u, 1.1 * u);
+  ctx.lineTo(-0.55 * u, 1.1 * u);
+  ctx.closePath();
+  ctx.fill();
+
+  // body
+  ctx.fillStyle = '#c9c9d2';
+  ctx.beginPath();
+  ctx.moveTo(-1.1 * u, 0.7 * u);
+  ctx.lineTo(-1.1 * u, -0.9 * u);
+  ctx.lineTo(-0.55 * u, -1.5 * u);
+  ctx.lineTo(0.55 * u, -1.5 * u);
+  ctx.lineTo(1.1 * u, -0.9 * u);
+  ctx.lineTo(1.1 * u, 0.7 * u);
+  ctx.closePath();
+  ctx.fill();
+  // window
+  ctx.fillStyle = '#27406e';
+  ctx.beginPath();
+  ctx.arc(0, -0.55 * u, 0.34 * u, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ---------- HUD ----------
+let lastThrottle = 0;
+function updateHUD() {
+  document.getElementById('h-alt').textContent = Math.max(0, state.y).toFixed(1);
+  document.getElementById('h-vx').textContent = `${state.vx >= 0 ? '+' : ''}${state.vx.toFixed(2)} m/s`;
+  document.getElementById('h-vy').textContent = `${state.vy >= 0 ? '+' : ''}${state.vy.toFixed(2)} m/s`;
+  document.getElementById('h-th').textContent = `${state.theta.toFixed(1)}°`;
+  document.getElementById('h-fuel').textContent = `${state.fuel.toFixed(1)} kg`;
+  const thr = mode === 'manual' ? manualThrottle : lastThrottle;
+  document.getElementById('h-thr').textContent = `${Math.round(thr * 100)} %`;
+  const tag = document.getElementById('mode-tag');
+  tag.textContent =
+    mode === 'manual' ? 'MANUAL FLIGHT — arrows/WASD + SPACE' :
+    mode === 'replay' ? 'AUTOPILOT REPLAY — real time' :
+    verdict ? (verdict.landed ? 'AUTOPILOT RESULT: LANDED' : 'AUTOPILOT RESULT: CRASHED') :
+    'READY — RUN AUTOPILOT, REPLAY SLOW, or MANUAL MODE';
+}
+
+// ---------- main loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+
+  if (mode === 'manual' && !verdict) {
+    let torque = 0;
+    if (keys.ArrowLeft || keys.KeyA) torque -= 1;
+    if (keys.ArrowRight || keys.KeyD) torque += 1;
+    if (keys.Space) manualThrottle = 1;
+    else {
+      if (keys.ArrowUp || keys.KeyW) manualThrottle += 0.8 * dt;
+      if (keys.ArrowDown || keys.KeyS) manualThrottle -= 0.8 * dt;
+      manualThrottle = clamp(manualThrottle, 0, 1);
+    }
+    lastThrottle = manualThrottle;
+    acc += dt;
+    while (acc >= CONST.DT && mode === 'manual') {
+      acc -= CONST.DT;
+      doStep(manualThrottle, torque);
+    }
+  } else if (mode === 'replay' && !verdict) {
+    replayT += dt;
+    const target = Math.floor(replayT / CONST.DT);
+    while (simSteps < target && !verdict) {
+      const c = autopilot(state); // deterministic: identical to run()
+      lastThrottle = c.throttle;
+      doStep(c.throttle, c.torque);
+    }
+  }
+
+  draw();
+  updateHUD();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /Users/shk/experiments/builds/5-models/qwen-3.8-flash && node -e \"\nimport\\('./sim.mjs'\\).then\\(m => {\n  const r = m.run\\(\\);\n  const f = r.final;\n  console.log\\('verdict:', r.verdict.banner, '|', r.verdict.reason ?? ''\\);\n  console.log\\('t=', r.time.toFixed\\(2\\), 'steps=', r.steps\\);\n  console.log\\('vy=', f.vy.toFixed\\(3\\), 'vx=', f.vx.toFixed\\(3\\), 'theta=', f.theta.toFixed\\(3\\), 'x=', f.x.toFixed\\(3\\), 'fuel=', f.fuel.toFixed\\(2\\)\\);\n  console.log\\('traj len:', r.trajectory.length\\);\n}\\);\n\")",
+      "Bash(cd /Users/shk/experiments/builds/5-models/qwen-3.8-flash && node -e \"\nimport\\('./sim.mjs'\\).then\\(m => {\n  const a = JSON.stringify\\(m.run\\(\\)\\);\n  const b = JSON.stringify\\(m.run\\(\\)\\);\n  console.log\\('identical:', a === b, '| hash run1:', require\\('crypto'\\).createHash\\('sha256'\\).update\\(a\\).digest\\('hex'\\).slice\\(0,16\\)\\);\n}\\);\n\")"
+    ]
+  }
+}
